@@ -1,0 +1,75 @@
+const express = require('express');
+const router = express.Router();
+const transporter = require('../config/nodemailer');
+
+const path = require('path');
+const fs = require('fs');
+
+router.post('/send', async (req, res) => {
+    const { recipients, subject, message } = req.body;
+
+    if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
+        return res.status(400).json({ success: false, message: 'No recipients provided' });
+    }
+
+    if (!subject || !message) {
+        return res.status(400).json({ success: false, message: 'Subject and message are required' });
+    }
+
+    const results = {
+        success: [],
+        failed: []
+    };
+
+    // Check for "It Circle" logo usage to embed it
+    let emailHtml = message;
+    const attachments = [];
+    const logoUrl = 'http://localhost:3000/it-circle-logo.png';
+
+    if (emailHtml.includes(logoUrl)) {
+        emailHtml = emailHtml.replace(logoUrl, 'cid:it-circle-logo');
+        const logoPath = path.join(__dirname, '../../client/public/it-circle-logo.png');
+
+        // Only attach if file exists
+        if (fs.existsSync(logoPath)) {
+            attachments.push({
+                filename: 'it-circle-logo.png',
+                path: logoPath,
+                cid: 'it-circle-logo'
+            });
+        }
+    }
+
+    try {
+        // Iterate and send emails
+        for (const recipient of recipients) {
+            const mailOptions = {
+                from: process.env.EMAIL_USER,
+                to: recipient.email,
+                subject: subject,
+                html: emailHtml,
+                attachments: attachments
+            };
+
+            try {
+                await transporter.sendMail(mailOptions);
+                results.success.push(recipient.email);
+            } catch (error) {
+                console.error(`Failed to send to ${recipient.email}:`, error);
+                results.failed.push({ email: recipient.email, error: error.message });
+            }
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Email sending process completed',
+            results
+        });
+
+    } catch (error) {
+        console.error('Global error in sending emails:', error);
+        res.status(500).json({ success: false, message: 'Internal Server Error' });
+    }
+});
+
+module.exports = router;
