@@ -12,6 +12,10 @@ router.post('/send', async (req, res) => {
         return res.status(400).json({ success: false, message: 'No recipients provided' });
     }
 
+    // Debugging: Check what data is being received
+    console.log('Received recipients:', JSON.stringify(recipients.slice(0, 3), null, 2)); // Log first 3
+
+
     if (!subject || !message) {
         return res.status(400).json({ success: false, message: 'Subject and message are required' });
     }
@@ -40,13 +44,19 @@ router.post('/send', async (req, res) => {
         }
     }
 
+    // Basic helper to strip HTML for the text version
+    const stripHtml = (html) => {
+        return html.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
+    };
+
     try {
         // Iterate and send emails
         for (const recipient of recipients) {
             const mailOptions = {
-                from: process.env.EMAIL_USER,
+                from: `"Khwopa IT Circle" <${process.env.EMAIL_USER}>`, // Add a nice display name
                 to: recipient.email,
                 subject: subject,
+                text: stripHtml(emailHtml), // Plain text fallback
                 html: emailHtml,
                 attachments: attachments
             };
